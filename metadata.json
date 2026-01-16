@@ -1,0 +1,7 @@
+{
+  "name": "PawSay - Pet Needs Explained",
+  "description": "A cute AI-powered app that translates your pet's meows and woofs into human needs! Fun and friendly Pet Assistant - Easy to use.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
