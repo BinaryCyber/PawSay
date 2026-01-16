@@ -61,7 +61,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel, initialData
             <label className="block text-sm font-bold text-slate-500 uppercase tracking-wider mb-1">Name</label>
             <input
               required
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-pink-400 transition"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-pink-400 transition text-black"
               placeholder="e.g. Whiskers"
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
@@ -72,7 +72,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel, initialData
             <div>
               <label className="block text-sm font-bold text-slate-500 uppercase tracking-wider mb-1">Breed</label>
               <input
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-pink-400 transition"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-pink-400 transition text-black"
                 placeholder="e.g. Tabby"
                 value={formData.breed}
                 onChange={e => setFormData({ ...formData, breed: e.target.value })}
@@ -81,7 +81,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel, initialData
             <div>
               <label className="block text-sm font-bold text-slate-500 uppercase tracking-wider mb-1">Age</label>
               <input
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-pink-400 transition"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-pink-400 transition text-black"
                 placeholder="e.g. 3 years"
                 value={formData.age}
                 onChange={e => setFormData({ ...formData, age: e.target.value })}
@@ -93,7 +93,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ onSave, onCancel, initialData
             <label className="block text-sm font-bold text-slate-500 uppercase tracking-wider mb-1">Personality</label>
             <textarea
               rows={2}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-pink-400 transition resize-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-pink-400 transition resize-none text-black"
               placeholder="e.g. Friendly, but shy around strangers..."
               value={formData.personality}
               onChange={e => setFormData({ ...formData, personality: e.target.value })}
