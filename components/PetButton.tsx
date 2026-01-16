@@ -57,9 +57,12 @@ const PetButton: React.FC<PetButtonProps> = ({ petType, appState, selectedProfil
     onStopRecording();
   };
 
+  // Fallback cute animal images from Unsplash
   const catImg = "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=400&auto=format&fit=crop";
   const dogImg = "https://images.unsplash.com/photo-1517849845537-4d257902454a?q=80&w=400&auto=format&fit=crop";
-  const currentImg = petType === PetType.CAT ? catImg : dogImg;
+  
+  // Use profile image if available, otherwise use species fallback
+  const currentImg = selectedProfile?.imageUrl || (petType === PetType.CAT ? catImg : dogImg);
 
   const radius = 140;
   const circumference = 2 * Math.PI * radius;
@@ -113,8 +116,9 @@ const PetButton: React.FC<PetButtonProps> = ({ petType, appState, selectedProfil
           isPressed ? 'border-pink-400' : 'border-white'
         }`}>
           <img 
+            key={currentImg} // Force re-render on image change for smooth transition
             src={currentImg} 
-            alt={petType} 
+            alt={selectedProfile?.name || petType} 
             className={`w-full h-full object-cover select-none pointer-events-none transition-transform duration-700 ${
               isPressed ? 'scale-110' : ''
             }`}
