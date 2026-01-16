@@ -1,6 +1,7 @@
 
-import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { PetType, TranslationResult, PetProfile } from "../types";
+import { sanitizeForPrompt } from "../utils/security";
 
 const getAiClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -13,36 +14,38 @@ export const analyzePetAudio = async (
   
   let profileContext = "";
   if (profile) {
+    const safeName = sanitizeForPrompt(profile.name);
+    const safeBreed = sanitizeForPrompt(profile.breed || 'Unknown');
+    const safePersonality = sanitizeForPrompt(profile.personality || 'Standard', 100);
+
     profileContext = `
-      The pet's name is ${profile.name}.
+      The pet's name is ${safeName}.
       Species: ${profile.type}.
-      Breed: ${profile.breed || 'Unknown'}.
-      Age: ${profile.age || 'Unknown'}.
-      Personality: ${profile.personality || 'Standard'}.
+      Breed: ${safeBreed}.
+      Age: ${sanitizeForPrompt(profile.age || 'Unknown', 20)}.
+      Personality: ${safePersonality}.
     `;
   }
 
-  const petVocalization = petType === PetType.CAT ? 'MEOW' : 'WOOF/BARK/WHINE';
+  const petVocalization = petType === PetType.CAT ? 'MEOW/PURR/HISS' : 'WOOF/BARK/WHINE/GROWL';
 
-  const systemInstruction = `You are a world-class animal behaviorist and acoustic analyst specializing in ${petType} vocalizations. 
+  const systemInstruction = `You are a world-class animal behaviorist and professional acoustic forensic analyst. 
+Your specialty is distinguishing animal vocalizations from human speech and ambient noise.
 
-CRITICAL REQUIREMENT:
-Your first and most important task is to verify if the audio contains a clear and distinct ${petVocalization}. 
-You must be extremely strict. 
+STEP 1: ACOUSTIC AUDIT
+Analyze the audio for specific signatures:
+- "pet_vocalization": Distinct ${petType} sounds (${petVocalization}). Look for characteristic pitch patterns and duration.
+- "human_speech": Human voices, talking, whispering, or singing. 
+- "background_noise": TV sounds, wind, thumps, traffic, or generic room hiss.
+- "silence": No significant audio signal above noise floor.
 
-DO NOT translate if:
-1. The audio is mostly silence or low-level background hiss.
-2. The audio contains human speech, TV sounds, or music.
-3. The sound is an ambiguous thump, wind, or generic room noise.
-4. You are unsure if it's an actual ${petType} vocalization.
+STEP 2: CLASSIFICATION
+You must categorize the dominant sound. If human speech is audible or prominent, classify as "human_speech" and do NOT translate.
 
-If any of the above conditions are met, you MUST set "soundDetected" to false.
-
-If, and only if, a clear ${petVocalization} is present:
-- Set "soundDetected" to true.
-- Identify the primary emotion (e.g., Hungry, Happy, Scared, Angry, Nervous, Playful, Curious, Lonely, Affection-seeking).
-- Provide a brief, characterful explanation from the pet's perspective.
-- Provide practical care advice for the owner.
+STEP 3: TRANSLATION (Only if soundDetected is true)
+- Identify the primary emotion (Hungry, Happy, Scared, Angry, Nervous, Playful, Curious, Lonely, Affection-seeking).
+- Provide a characterful translation from the pet's perspective.
+- Provide practical care advice.
 
 ${profileContext}`;
 
@@ -57,7 +60,7 @@ ${profileContext}`;
           }
         },
         {
-          text: `Acoustic Analysis: Is there a clear ${petType} ${petVocalization} in this recording? Respond in JSON.`
+          text: `Perform a detailed acoustic audit of this recording for ${petType} vocalizations vs noise/human speech. Respond in JSON.`
         }
       ]
     },
@@ -67,22 +70,25 @@ ${profileContext}`;
       responseSchema: {
         type: Type.OBJECT,
         properties: {
+          detectedSoundType: { 
+            type: Type.STRING, 
+            description: "Must be exactly one of: pet_vocalization, human_speech, background_noise, silence." 
+          },
           soundDetected: { 
             type: Type.BOOLEAN, 
-            description: "Strictly true ONLY if a clear animal vocalization is heard. False for human speech, noise, or silence." 
+            description: "Strictly true ONLY if detectedSoundType is 'pet_vocalization'." 
           },
-          emotion: { type: Type.STRING, description: "The specific emotion detected (null if soundDetected is false)." },
-          explanation: { type: Type.STRING, description: "Characterful interpretation (null if soundDetected is false)." },
-          advice: { type: Type.STRING, description: "Care advice (null if soundDetected is false)." }
+          emotion: { type: Type.STRING, nullable: true },
+          explanation: { type: Type.STRING, nullable: true },
+          advice: { type: Type.STRING, nullable: true }
         },
-        required: ["soundDetected", "emotion", "explanation", "advice"]
+        required: ["detectedSoundType", "soundDetected", "emotion", "explanation", "advice"]
       }
     }
   });
 
   const result = JSON.parse(response.text) as TranslationResult;
   
-  // Only generate an image if a sound was actually detected
   let imageResult = undefined;
   if (result.soundDetected && result.emotion) {
     imageResult = await generatePetImage(petType, result.emotion, profile);
@@ -96,14 +102,34 @@ ${profileContext}`;
 
 const generatePetImage = async (petType: PetType, emotion: string, profile?: PetProfile): Promise<string | undefined> => {
   const ai = getAiClient();
-  const detail = profile ? `a ${profile.breed} named ${profile.name}` : `a ${petType}`;
-  const prompt = `A very cute, high-quality, 3D animated style illustration of ${detail} looking ${emotion.toLowerCase()}. Vibrant colors, soft lighting, simple background. Body language reflects: ${emotion}.`;
+  
+  let petDescription = `a ${petType}`;
+  let traitDescription = "";
+  
+  if (profile) {
+    const safeBreed = sanitizeForPrompt(profile.breed && profile.breed !== "Other" ? profile.breed : petType);
+    petDescription = `a ${safeBreed} ${petType}`;
+    if (profile.personality) {
+      const safeTrait = sanitizeForPrompt(profile.personality, 80);
+      traitDescription = `This pet has a ${safeTrait.toLowerCase()} personality which shows in its expression.`;
+    }
+  }
+
+  const prompt = `A high-quality, adorable, 3D animated style illustration of ${petDescription} expressing the emotion: ${emotion.toUpperCase()}. 
+  The pet is at the center of the frame. ${traitDescription}
+  Vibrant, soft pastel colors, professional studio lighting, and a clean simple background. 
+  Extremely expressive eyes and detailed fur texture. 
+  The image perfectly captures a pet that feels ${emotion.toLowerCase()}.`;
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: { parts: [{ text: prompt }] },
-      config: { imageConfig: { aspectRatio: "1:1" } }
+      config: { 
+        imageConfig: { 
+          aspectRatio: "1:1" 
+        } 
+      }
     });
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {

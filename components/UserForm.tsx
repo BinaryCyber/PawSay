@@ -85,9 +85,18 @@ const AuthForm: React.FC<AuthFormProps> = ({ onAuth, onCancel, onContinueAsGuest
           </div>
         </div>
 
-        <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center">
+        <h2 className="text-2xl font-bold text-slate-800 mb-2 text-center">
           {mode === 'signup' ? 'Create Your Account' : 'Welcome Back'}
         </h2>
+
+        {/* Security Warning */}
+        <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl mb-6 flex items-start space-x-3">
+          <span className="text-lg">🛡️</span>
+          <p className="text-[10px] text-amber-700 font-medium leading-tight">
+            <span className="font-bold block uppercase tracking-tighter mb-1">Security Notice</span>
+            This is a demo application. Data is stored in your browser's local storage in plaintext. Do not use real or sensitive passwords.
+          </p>
+        </div>
 
         {error && (
           <div className="bg-red-50 text-red-500 text-xs font-bold p-3 rounded-xl mb-6 text-center border border-red-100">

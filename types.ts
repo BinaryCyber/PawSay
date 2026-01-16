@@ -44,8 +44,8 @@ export interface CommunityPost {
   text: string;
   imageUrl?: string;
   timestamp: number;
-  likes: string[]; // Array of user IDs
-  reports: string[]; // Array of reporter user IDs
+  likes: string[]; 
+  reports: string[]; 
   comments: CommunityComment[];
 }
 
@@ -59,9 +59,10 @@ export interface ReportedPost {
 
 export interface TranslationResult {
   soundDetected: boolean;
-  emotion: string;
-  explanation: string;
-  advice: string;
+  detectedSoundType: 'pet_vocalization' | 'human_speech' | 'background_noise' | 'silence';
+  emotion: string | null;
+  explanation: string | null;
+  advice: string | null;
   imageUrl?: string;
 }
 

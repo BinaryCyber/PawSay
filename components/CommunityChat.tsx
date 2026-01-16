@@ -1,6 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { UserProfile, CommunityPost, CommunityComment, ReportedPost } from '../types';
+import { sanitizeText, isSafeImageUrl } from '../utils/security';
 
 interface CommunityChatProps {
   currentUser: UserProfile;
@@ -16,14 +17,21 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ currentUser, posts, onPos
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handlePost = () => {
-    if (!newPostText.trim() && !newPostImage) return;
+    const sanitizedText = sanitizeText(newPostText);
+    if (!sanitizedText && !newPostImage) return;
+
+    // Validate image security if present
+    if (newPostImage && !isSafeImageUrl(newPostImage)) {
+      alert("Invalid image format detected.");
+      return;
+    }
 
     const post: CommunityPost = {
       id: Date.now().toString(),
       authorId: currentUser.id,
       authorName: currentUser.username,
       authorAvatar: currentUser.avatarUrl,
-      text: newPostText,
+      text: sanitizedText,
       imageUrl: newPostImage || undefined,
       timestamp: Date.now(),
       likes: [],
@@ -55,13 +63,11 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ currentUser, posts, onPos
     const post = posts.find(p => p.id === postId);
     if (!post) return;
 
-    // Safety: don't let user report multiple times
     if (Array.isArray(post.reports) && post.reports.includes(currentUser.id)) {
       alert("You have already reported this post.");
       return;
     }
 
-    // 1. Update post object's internal reports array
     const updatedPosts = posts.map(p => {
       if (p.id === postId) {
         const currentReports = Array.isArray(p.reports) ? p.reports : [];
@@ -71,7 +77,6 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ currentUser, posts, onPos
     });
     onPostsChange(updatedPosts);
 
-    // 2. Save detailed report to the "Admin Database"
     const savedReports = localStorage.getItem('pawsay_admin_reports');
     const reportsList: ReportedPost[] = savedReports ? JSON.parse(savedReports) : [];
     
@@ -94,14 +99,15 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ currentUser, posts, onPos
   };
 
   const handleReply = (postId: string) => {
-    if (!replyText.trim()) return;
+    const sanitizedReply = sanitizeText(replyText);
+    if (!sanitizedReply) return;
 
     const comment: CommunityComment = {
       id: Date.now().toString(),
       authorId: currentUser.id,
       authorName: currentUser.username,
       authorAvatar: currentUser.avatarUrl,
-      text: replyText,
+      text: sanitizedReply,
       timestamp: Date.now()
     };
 
@@ -113,16 +119,23 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ currentUser, posts, onPos
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert("Image too large. Please keep it under 2MB.");
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
-        setNewPostImage(reader.result as string);
+        const result = reader.result as string;
+        if (isSafeImageUrl(result)) {
+          setNewPostImage(result);
+        } else {
+          alert("Selected file type is not supported.");
+        }
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // Filter out posts with more than 3 reports (hidden until admin review)
-  // Also handle cases where reports might still be a number from old data
   const filteredPosts = posts.filter(post => {
     const reportCount = Array.isArray(post.reports) ? post.reports.length : (typeof post.reports === 'number' ? post.reports : 0);
     return reportCount <= 3;
@@ -130,11 +143,10 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ currentUser, posts, onPos
 
   return (
     <div className="flex flex-col h-full bg-slate-50">
-      {/* Post Creator */}
       <div className="bg-white p-4 border-b border-slate-100 shadow-sm sticky top-[80px] z-30">
         <div className="flex space-x-3">
           <div className="w-10 h-10 rounded-full bg-slate-100 flex-shrink-0 overflow-hidden border">
-            {currentUser.avatarUrl ? <img src={currentUser.avatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-400">👤</div>}
+            {currentUser.avatarUrl && isSafeImageUrl(currentUser.avatarUrl) ? <img src={currentUser.avatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-400">👤</div>}
           </div>
           <div className="flex-1">
             <textarea
@@ -154,10 +166,10 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ currentUser, posts, onPos
             )}
             <div className="flex items-center justify-between mt-3">
               <button onClick={() => fileInputRef.current?.click()} className="flex items-center space-x-2 text-slate-400 hover:text-blue-500 text-xs font-bold transition">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2-2v12a2 2 0 002 2z" /></svg>
                 <span>Add Photo</span>
               </button>
-              <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
+              <input type="file" ref={fileInputRef} className="hidden" accept="image/png,image/jpeg" onChange={handleImageUpload} />
               <button 
                 onClick={handlePost} 
                 disabled={!newPostText.trim() && !newPostImage}
@@ -170,7 +182,6 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ currentUser, posts, onPos
         </div>
       </div>
 
-      {/* Feed */}
       <div className="p-4 space-y-6">
         {filteredPosts.length === 0 ? (
           <div className="text-center py-20 text-slate-400 italic">
@@ -181,7 +192,7 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ currentUser, posts, onPos
             <div className="p-4 flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-9 h-9 rounded-full bg-slate-100 overflow-hidden border">
-                  {post.authorAvatar ? <img src={post.authorAvatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">👤</div>}
+                  {post.authorAvatar && isSafeImageUrl(post.authorAvatar) ? <img src={post.authorAvatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">👤</div>}
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-slate-800">{post.authorName}</h4>
@@ -201,7 +212,7 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ currentUser, posts, onPos
               <p className="text-slate-700 text-sm leading-relaxed">{post.text}</p>
             </div>
 
-            {post.imageUrl && (
+            {post.imageUrl && isSafeImageUrl(post.imageUrl) && (
               <div className="w-full bg-slate-100 flex items-center justify-center overflow-hidden max-h-[400px]">
                 <img src={post.imageUrl} className="w-full object-contain" />
               </div>
@@ -224,13 +235,12 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ currentUser, posts, onPos
               </button>
             </div>
 
-            {/* Comments List */}
             {post.comments.length > 0 && (
               <div className="px-4 pb-4 space-y-3 bg-slate-50/50">
                 {post.comments.map(comment => (
                   <div key={comment.id} className="flex space-x-2 animate-in fade-in slide-in-from-left-2 duration-200">
                     <div className="w-7 h-7 rounded-full bg-slate-200 overflow-hidden shrink-0">
-                      {comment.authorAvatar ? <img src={comment.authorAvatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[8px] text-slate-400">👤</div>}
+                      {comment.authorAvatar && isSafeImageUrl(comment.authorAvatar) ? <img src={comment.authorAvatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[8px] text-slate-400">👤</div>}
                     </div>
                     <div className="bg-white rounded-2xl p-3 border border-slate-100 flex-1">
                       <div className="flex justify-between items-center mb-1">
@@ -244,7 +254,6 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ currentUser, posts, onPos
               </div>
             )}
 
-            {/* Reply Input */}
             {activeReplyPostId === post.id && (
               <div className="p-4 border-t border-slate-50 flex space-x-2 animate-in slide-in-from-top-2 duration-200">
                 <input

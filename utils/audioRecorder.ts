@@ -1,4 +1,3 @@
-
 export class AudioRecorder {
   private mediaRecorder: MediaRecorder | null = null;
   private audioChunks: Blob[] = [];
@@ -30,7 +29,6 @@ export class AudioRecorder {
           resolve(base64String);
         };
         
-        // Stop all tracks to release the microphone
         this.mediaRecorder?.stream.getTracks().forEach(track => track.stop());
       };
 

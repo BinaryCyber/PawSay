@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { PetType } from '../types';
 
@@ -33,11 +32,9 @@ const AnalyzingOverlay: React.FC<AnalyzingOverlayProps> = ({ petType }) => {
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-white/60 backdrop-blur-md animate-in fade-in duration-300">
       <div className="flex flex-col items-center">
         <div className="relative w-40 h-40 flex items-center justify-center">
-          {/* Pulsing Background Rings */}
           <div className="absolute inset-0 bg-pink-400/20 rounded-full animate-ping"></div>
           <div className="absolute inset-4 bg-pink-400/10 rounded-full animate-pulse"></div>
           
-          {/* Central Icon Area */}
           <div className="relative z-10 w-24 h-24 bg-white rounded-full shadow-xl flex items-center justify-center text-4xl border-4 border-white">
             <span className="animate-bounce">
               {petType === PetType.CAT ? '🐱' : '🐶'}
@@ -47,7 +44,6 @@ const AnalyzingOverlay: React.FC<AnalyzingOverlayProps> = ({ petType }) => {
             </div>
           </div>
           
-          {/* Orbiting Icons */}
           <div className="absolute inset-0 animate-spin-slow pointer-events-none">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 text-xl">🦴</div>
             <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-xl">🐟</div>

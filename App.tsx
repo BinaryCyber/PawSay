@@ -33,7 +33,6 @@ const App: React.FC = () => {
   
   const recorderRef = useRef<AudioRecorder>(new AudioRecorder());
 
-  // Data persistence
   useEffect(() => {
     const savedUsers = localStorage.getItem('pawsay_users_list');
     if (savedUsers) setAllUsers(JSON.parse(savedUsers));
@@ -47,7 +46,6 @@ const App: React.FC = () => {
     const sessionUser = sessionStorage.getItem('pawsay_current_session');
     if (sessionUser) {
       const parsed = JSON.parse(sessionUser);
-      // Fresh check against master list for deactivation/admin status
       const masterUser = (JSON.parse(savedUsers || '[]') as UserProfile[]).find(u => u.id === parsed.id);
       if (masterUser && !masterUser.isDeactivated) {
         setCurrentUser(masterUser);
@@ -66,7 +64,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     localStorage.setItem('pawsay_users_list', JSON.stringify(allUsers));
-    // Update current user if they are in the list (sync warnings/admin status)
     if (currentUser) {
       const updated = allUsers.find(u => u.id === currentUser.id);
       if (updated && (updated.warnings !== currentUser.warnings || updated.isDeactivated !== currentUser.isDeactivated)) {
@@ -144,7 +141,13 @@ const App: React.FC = () => {
       const translation = await analyzePetAudio(audioBase64, currentPetType, selectedProfile || undefined);
       
       if (!translation.soundDetected) {
-        setError(`No ${currentPetType} sound detected. Please try again!`);
+        if (translation.detectedSoundType === 'human_speech') {
+          setError("I heard a human! Try capturing only your pet's voice.");
+        } else if (translation.detectedSoundType === 'silence') {
+          setError("It was too quiet. Try moving closer to your pet!");
+        } else {
+          setError(`No clear ${currentPetType} sound detected. Try again!`);
+        }
         setAppState(AppState.IDLE);
       } else {
         setResult(translation);
@@ -171,7 +174,6 @@ const App: React.FC = () => {
       return;
     }
     if (!allUsers.some(u => u.id === user.id)) {
-      // Secret backdoor for first user or "admin" username to be admin
       if (allUsers.length === 0 || user.username.toLowerCase().includes('admin')) {
         user.isAdmin = true;
       }
@@ -266,7 +268,7 @@ const App: React.FC = () => {
               className={`p-2 rounded-xl transition ${viewMode === ViewMode.ADMIN ? 'bg-yellow-500 text-white shadow-md' : 'text-yellow-600 bg-yellow-50 hover:bg-yellow-100'}`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924-1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </button>
@@ -326,8 +328,11 @@ const App: React.FC = () => {
                 
                 <div className="h-28 flex items-center justify-center w-full">
                   {error && (
-                    <div className="bg-red-50 text-red-600 px-6 py-4 rounded-3xl text-center font-bold border-2 border-red-100 animate-bounce max-w-xs">
-                      {error}
+                    <div className="bg-red-50 text-red-600 px-6 py-4 rounded-3xl text-center font-bold border-2 border-red-100 animate-bounce max-w-xs flex flex-col items-center space-y-2">
+                      <span className="text-2xl">
+                        {error.includes("human") ? "👤" : (error.includes("quiet") ? "🤫" : "🚫")}
+                      </span>
+                      <span>{error}</span>
                     </div>
                   )}
                 </div>
