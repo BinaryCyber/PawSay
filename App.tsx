@@ -119,7 +119,7 @@ const App: React.FC = () => {
       await recorderRef.current.start();
       setAppState(AppState.RECORDING);
     } catch (err) {
-      console.error(err);
+      console.error("Microphone Error:", err);
       setError("Microphone access is needed to listen to your pet!");
     }
   }, []);
@@ -137,8 +137,8 @@ const App: React.FC = () => {
 
     setAppState(AppState.ANALYZING);
     try {
-      const audioBase64 = await recorderRef.current.stop();
-      const translation = await analyzePetAudio(audioBase64, currentPetType, selectedProfile || undefined);
+      const { base64, mimeType } = await recorderRef.current.stop();
+      const translation = await analyzePetAudio(base64, mimeType, currentPetType, selectedProfile || undefined);
       
       if (!translation.soundDetected) {
         if (translation.detectedSoundType === 'human_speech') {
@@ -154,8 +154,8 @@ const App: React.FC = () => {
         setAppState(AppState.RESULT);
       }
     } catch (err) {
-      console.error(err);
-      setError("AI couldn't hear that clearly. Try again?");
+      console.error("Analysis Error:", err);
+      setError("AI analysis failed. Please check your internet and API Key.");
       setAppState(AppState.ERROR);
     }
   }, [appState, currentPetType, selectedProfile, recordingStartTime]);

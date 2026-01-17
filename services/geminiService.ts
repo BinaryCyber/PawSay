@@ -7,6 +7,7 @@ const getAiClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const analyzePetAudio = async (
   audioBase64: string, 
+  mimeType: string,
   petType: PetType, 
   profile?: PetProfile
 ): Promise<TranslationResult> => {
@@ -29,75 +30,73 @@ export const analyzePetAudio = async (
 
   const petVocalization = petType === PetType.CAT ? 'MEOW/PURR/HISS' : 'WOOF/BARK/WHINE/GROWL';
 
-  const systemInstruction = `You are a world-class animal behaviorist and professional acoustic forensic analyst. 
-Your specialty is distinguishing animal vocalizations from human speech and ambient noise.
+  const systemInstruction = `You are a world-class animal behaviorist and acoustic analyst.
+Analyze the provided audio for ${petType} sounds.
 
-STEP 1: ACOUSTIC AUDIT
-Analyze the audio for specific signatures:
-- "pet_vocalization": Distinct ${petType} sounds (${petVocalization}). Look for characteristic pitch patterns and duration.
-- "human_speech": Human voices, talking, whispering, or singing. 
-- "background_noise": TV sounds, wind, thumps, traffic, or generic room hiss.
-- "silence": No significant audio signal above noise floor.
+AUDIT TASKS:
+1. Determine if the sound is primarily a ${petType} vocalization (${petVocalization}).
+2. Filter out human speech or background noise. If human talking is the main feature, mark soundDetected as false.
+3. If a ${petType} is heard, identify the emotion and provide a fun translation.
 
-STEP 2: CLASSIFICATION
-You must categorize the dominant sound. If human speech is audible or prominent, classify as "human_speech" and do NOT translate.
-
-STEP 3: TRANSLATION (Only if soundDetected is true)
-- Identify the primary emotion (Hungry, Happy, Scared, Angry, Nervous, Playful, Curious, Lonely, Affection-seeking).
-- Provide a characterful translation from the pet's perspective.
-- Provide practical care advice.
+JSON STRUCTURE:
+{
+  "detectedSoundType": "pet_vocalization" | "human_speech" | "background_noise" | "silence",
+  "soundDetected": boolean,
+  "emotion": string | null,
+  "explanation": "Human-friendly translation of what the pet is saying",
+  "advice": "Care advice for the owner"
+}
 
 ${profileContext}`;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: {
-      parts: [
-        {
-          inlineData: {
-            mimeType: 'audio/webm',
-            data: audioBase64
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: mimeType,
+              data: audioBase64
+            }
+          },
+          {
+            text: `Analyze this audio for ${petType} sounds and return the results in JSON format.`
           }
-        },
-        {
-          text: `Perform a detailed acoustic audit of this recording for ${petType} vocalizations vs noise/human speech. Respond in JSON.`
+        ]
+      },
+      config: {
+        systemInstruction,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            detectedSoundType: { type: Type.STRING },
+            soundDetected: { type: Type.BOOLEAN },
+            emotion: { type: Type.STRING, nullable: true },
+            explanation: { type: Type.STRING, nullable: true },
+            advice: { type: Type.STRING, nullable: true }
+          },
+          required: ["detectedSoundType", "soundDetected", "emotion", "explanation", "advice"]
         }
-      ]
-    },
-    config: {
-      systemInstruction,
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          detectedSoundType: { 
-            type: Type.STRING, 
-            description: "Must be exactly one of: pet_vocalization, human_speech, background_noise, silence." 
-          },
-          soundDetected: { 
-            type: Type.BOOLEAN, 
-            description: "Strictly true ONLY if detectedSoundType is 'pet_vocalization'." 
-          },
-          emotion: { type: Type.STRING, nullable: true },
-          explanation: { type: Type.STRING, nullable: true },
-          advice: { type: Type.STRING, nullable: true }
-        },
-        required: ["detectedSoundType", "soundDetected", "emotion", "explanation", "advice"]
       }
-    }
-  });
+    });
 
-  const result = JSON.parse(response.text) as TranslationResult;
-  
-  let imageResult = undefined;
-  if (result.soundDetected && result.emotion) {
-    imageResult = await generatePetImage(petType, result.emotion, profile);
+    const result = JSON.parse(response.text) as TranslationResult;
+    
+    let imageResult = undefined;
+    if (result.soundDetected && result.emotion) {
+      imageResult = await generatePetImage(petType, result.emotion, profile);
+    }
+    
+    return {
+      ...result,
+      imageUrl: imageResult
+    };
+  } catch (error) {
+    console.error("Gemini API Error:", error);
+    throw error;
   }
-  
-  return {
-    ...result,
-    imageUrl: imageResult
-  };
 };
 
 const generatePetImage = async (petType: PetType, emotion: string, profile?: PetProfile): Promise<string | undefined> => {
@@ -111,25 +110,17 @@ const generatePetImage = async (petType: PetType, emotion: string, profile?: Pet
     petDescription = `a ${safeBreed} ${petType}`;
     if (profile.personality) {
       const safeTrait = sanitizeForPrompt(profile.personality, 80);
-      traitDescription = `This pet has a ${safeTrait.toLowerCase()} personality which shows in its expression.`;
+      traitDescription = `This pet has a ${safeTrait.toLowerCase()} personality.`;
     }
   }
 
-  const prompt = `A high-quality, adorable, 3D animated style illustration of ${petDescription} expressing the emotion: ${emotion.toUpperCase()}. 
-  The pet is at the center of the frame. ${traitDescription}
-  Vibrant, soft pastel colors, professional studio lighting, and a clean simple background. 
-  Extremely expressive eyes and detailed fur texture. 
-  The image perfectly captures a pet that feels ${emotion.toLowerCase()}.`;
+  const prompt = `A cute 3D animation style illustration of ${petDescription} expressing ${emotion}. Soft lighting, clean background.`;
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: { parts: [{ text: prompt }] },
-      config: { 
-        imageConfig: { 
-          aspectRatio: "1:1" 
-        } 
-      }
+      config: { imageConfig: { aspectRatio: "1:1" } }
     });
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
@@ -138,7 +129,7 @@ const generatePetImage = async (petType: PetType, emotion: string, profile?: Pet
       }
     }
   } catch (error) {
-    console.error("Image generation failed", error);
+    console.error("Image generation failed:", error);
     return undefined;
   }
   return undefined;
